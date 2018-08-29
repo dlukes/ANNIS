@@ -39,6 +39,7 @@ import org.corpus_tools.salt.common.SDocumentGraph;
 import org.corpus_tools.salt.common.SaltProject;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Stopwatch;
 import com.google.common.escape.Escaper;
@@ -90,8 +91,11 @@ public abstract class SaltBasedExporter implements ExporterPlugin, Serializable 
 		try {
 			Cache cache = cacheManager.getCache("saltProjectsCache");
 
+			boolean manuallyProvidedKeys = true;
 			if (keys == null || keys.isEmpty()) {
 				// auto set
+				manuallyProvidedKeys = false;
+				
 				keys = new LinkedList<>();
 				keys.add("tok");
 				List<AnnisAttribute> attributes = new LinkedList<>();
@@ -162,9 +166,13 @@ public abstract class SaltBasedExporter implements ExporterPlugin, Serializable 
 						if (args.containsKey("segmentation")) {
 							res = res.queryParam("segmentation", args.get("segmentation"));
 						}
-
+						
 						SubgraphFilter filter = getSubgraphFilter();
-						if (filter != null) {
+						if(manuallyProvidedKeys) {
+							// only include all manually provided annotations
+							res = res.queryParam("filternodeanno", Joiner.on(',').join(keys));
+						} else if (filter != null) {
+							// apply more general filter
 							res = res.queryParam("filter", filter.name());
 						}
 
