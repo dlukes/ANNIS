@@ -1052,13 +1052,13 @@ public class AnnisRunner extends AnnisBaseRunner
     if (queryFunction != null && queryFunction.matches("(sql_)?(annotate|find)"))
     {
       queryData.addExtension(new AnnotateQueryData(left, right,
-        segmentationLayer, filter));
+        segmentationLayer, filter, null));
       queryData.addExtension(new LimitOffsetQueryData(offset, limit, order));
     }
     else if (queryFunction != null && queryFunction.matches("(sql_)?subgraph"))
     {
       queryData.addExtension(new AnnotateQueryData(left, right,
-        segmentationLayer, filter));
+        segmentationLayer, filter, null));
     }
     else if (queryFunction != null && queryFunction.matches("(sql_)?frequency"))
     {
