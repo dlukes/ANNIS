@@ -26,7 +26,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -109,7 +108,10 @@ public class AnnotateSqlGenerator<T> extends AbstractSqlGenerator implements Sel
 		if (!annoExtList.isEmpty()) {
 			AnnotateQueryData annoExt = annoExtList.get(0);
 			
-			if (annoExt.getFilter() == SubgraphFilter.token) {
+			if(annoExt.getFilterNodeAnnos() != null && !annoExt.getFilterNodeAnnos().isEmpty()) {
+				result.add(getNodeAnnotationFilterCondition(annoExt.getFilterNodeAnnos()));
+			}
+			else if (annoExt.getFilter() == SubgraphFilter.token) {
 				result.add(tables.aliasedColumn(NODE_TABLE, "is_token") + " IS TRUE");
 			}
 		}
