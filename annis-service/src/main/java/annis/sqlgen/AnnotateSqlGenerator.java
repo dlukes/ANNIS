@@ -108,7 +108,7 @@ public class AnnotateSqlGenerator<T> extends AbstractSqlGenerator implements Sel
 		List<AnnotateQueryData> annoExtList = queryData.getExtensions(AnnotateQueryData.class);
 		if (!annoExtList.isEmpty()) {
 			AnnotateQueryData annoExt = annoExtList.get(0);
-
+			
 			if (annoExt.getFilter() == SubgraphFilter.token) {
 				result.add(tables.aliasedColumn(NODE_TABLE, "is_token") + " IS TRUE");
 			}

@@ -184,13 +184,16 @@ public interface QueryService
    * @param segmentation Optional parameter for segmentation layer on which the context is applied. Leave empty for token layer (which is default).
    * @param left Optional parameter for the left context size, default is 0.
    * @param right Optional parameter for the right context size, default is 0.
-   * @param filter Optional parameter with value "all" or "token". 
-   *  If "token" only token will be fetched. Default is "all".
+   * @param filter Optional parameter with value "all" or "token". If "token" only token will be fetched. Default is "all".
+   * @param filternodeanno  A comma separated list of node annotations which are 
+   * used as a filter for the graph. Only nodes having one of the annotations
+   * are included in the result.
+   *  
    * @return the graph of this hit.
    */
   SaltProject subgraph(
     MatchGroup requestBody,
-    String segmentation, String left, String right, String filter);
+    String segmentation, String left, String right, String filter, String filternodeanno);
   
   /**
    * Get the annotation graph of a complete document.
@@ -208,7 +211,7 @@ public interface QueryService
    * 
    * @param top The toplevel corpus.
    * @param doc The document.
-   * @param filternodeanno A comma seperated list of node annotations which are 
+   * @param filternodeanno A comma separated list of node annotations which are 
    * used as a filter for the graph. Only nodes having one of the annotations
    * are included in the result.
    * @return 

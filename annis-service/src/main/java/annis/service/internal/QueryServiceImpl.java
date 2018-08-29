@@ -16,6 +16,54 @@
  */
 package annis.service.internal;
 
+import static java.util.Arrays.asList;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.GenericEntity;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import javax.ws.rs.core.UriInfo;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.subject.Subject;
+import org.corpus_tools.salt.common.SaltProject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
+import com.google.mimeparse.MIMEParse;
+import com.sun.jersey.api.core.ResourceConfig;
+
 import annis.CommonHelper;
 import annis.GraphHelper;
 import annis.WekaHelper;
@@ -44,49 +92,6 @@ import annis.service.objects.SubgraphFilter;
 import annis.sqlgen.MatrixQueryData;
 import annis.sqlgen.extensions.AnnotateQueryData;
 import annis.sqlgen.extensions.LimitOffsetQueryData;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Lists;
-import com.google.common.io.ByteStreams;
-import com.google.mimeparse.MIMEParse;
-import com.sun.jersey.api.core.ResourceConfig;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import static java.util.Arrays.asList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TreeSet;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.GenericEntity;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
-import javax.ws.rs.core.UriInfo;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
-import org.corpus_tools.salt.common.SaltProject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 /**
  * Methods for querying the database.
@@ -378,7 +383,8 @@ public class QueryServiceImpl implements QueryService
     @QueryParam("segmentation") String segmentation, 
     @DefaultValue("0") @QueryParam("left") String leftRaw, 
     @DefaultValue("0") @QueryParam("right") String rightRaw, 
-    @DefaultValue("all") @QueryParam("filter") String filterRaw)
+    @DefaultValue("all") @QueryParam("filter") String filterRaw, 
+    @QueryParam("filternodeanno") String filternodeanno)
   {
     
     // some robustness stuff
@@ -390,7 +396,7 @@ public class QueryServiceImpl implements QueryService
         "missing required request body").build());
     }
     
-    return basicSubgraph(matches, segmentation, leftRaw, rightRaw, filterRaw);
+    return basicSubgraph(matches, segmentation, leftRaw, rightRaw, filterRaw, filternodeanno);
   }
   
   
@@ -406,21 +412,23 @@ public class QueryServiceImpl implements QueryService
     @QueryParam("segmentation") String segmentation, 
     @DefaultValue("0") @QueryParam("left") String leftRaw, 
     @DefaultValue("0") @QueryParam("right") String rightRaw, 
-    @DefaultValue("all") @QueryParam("filter") String filterRaw)
+    @DefaultValue("all") @QueryParam("filter") String filterRaw,
+    @QueryParam("filternodeanno") String filternodeanno)
   {
     // some robustness stuff
     requiredParameter(matchRaw, "match", "definition of the match");
     
     MatchGroup matches = MatchGroup.parseString(matchRaw);
     
-    return basicSubgraph(matches, segmentation, leftRaw, rightRaw, filterRaw);
+    return basicSubgraph(matches, segmentation, leftRaw, rightRaw, filterRaw, filternodeanno);
   }
   
   protected SaltProject basicSubgraph(MatchGroup matches, 
     @QueryParam("segmentation") String segmentation, 
     @DefaultValue("0") @QueryParam("left") String leftRaw, 
     @DefaultValue("0") @QueryParam("right") String rightRaw, 
-    @DefaultValue("all") @QueryParam("filter") String filterRaw)
+    @DefaultValue("all") @QueryParam("filter") String filterRaw,
+    @QueryParam("filternodeanno") String filterNodeAnnoRaw)
   {
     
     Subject user = SecurityUtils.getSubject();
@@ -431,8 +439,15 @@ public class QueryServiceImpl implements QueryService
 
     QueryData data = GraphHelper.createQueryData(matches, queryDao);
 
+    List<String> nodeAnnotationFilter = null;
+    if(filterNodeAnnoRaw != null)
+    {
+      nodeAnnotationFilter = Splitter.on(',').trimResults().omitEmptyStrings()
+        .splitToList(filterNodeAnnoRaw);
+    }
+    
     data.addExtension(new AnnotateQueryData(left, right,
-      segmentation, filter));
+      segmentation, filter, nodeAnnotationFilter));
 
     Set<String> corpusNames = new TreeSet<>();
 
