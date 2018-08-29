@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -256,11 +257,13 @@ public class AnnotateSqlGenerator<T> extends AbstractSqlGenerator implements Sel
 
 		return fields;
 	}
-
-	public String getDocumentQuery(long toplevelCorpusID, String documentName, List<String> nodeAnnotationFilter) {
-		TableAccessStrategy tas = createTableAccessStrategy();
-		List<String> fields = getSelectFields();
-
+	
+	private String getNodeAnnotationFilterCondition(List<String> nodeAnnotationFilter) {
+		
+		if(nodeAnnotationFilter == null) {
+			return null;
+		}
+		
 		boolean filter = false;
 		Set<String> qualifiedNodeAnnos = new LinkedHashSet<>();
 		Set<String> unqualifiedNodeAnnos = new LinkedHashSet<>();
@@ -277,6 +280,31 @@ public class AnnotateSqlGenerator<T> extends AbstractSqlGenerator implements Sel
 				}
 			}
 		}
+		
+		if (filter) {
+			StringBuilder condition = new StringBuilder();
+			condition.append("is_token IS TRUE");
+
+			if (!qualifiedNodeAnnos.isEmpty()) {
+				String orExpr = Joiner.on(")|(").join(qualifiedNodeAnnos);
+				condition.append(" OR node_qannotext ~ '(^((").append(orExpr).append(")):(.*)$)' ");
+			}
+			if (!unqualifiedNodeAnnos.isEmpty()) {
+				String orExpr = Joiner.on(")|(").join(unqualifiedNodeAnnos);
+				condition.append(" OR node_annotext ~ '(^((").append(orExpr).append(")):(.*)$)' ");
+			}
+			return condition.toString();
+		} else {
+			return null;
+		}
+		
+	}
+
+	public String getDocumentQuery(long toplevelCorpusID, String documentName, List<String> nodeAnnotationFilter) {
+		TableAccessStrategy tas = createTableAccessStrategy();
+		List<String> fields = getSelectFields();
+
+		String nodeAnnotationFilterCond = getNodeAnnotationFilterCondition(nodeAnnotationFilter);
 
 		StringBuilder template = new StringBuilder();
 		template.append("SELECT DISTINCT \n"
@@ -287,18 +315,10 @@ public class AnnotateSqlGenerator<T> extends AbstractSqlGenerator implements Sel
 				+ " = c.id\n" + "\tAND toplevel.top_level IS TRUE\n"
 				+ "\tAND c.pre >= toplevel.pre AND c.post <= toplevel.post\n");
 
-		if (filter) {
+		if (nodeAnnotationFilterCond != null) {
 
-			template.append("\tAND (is_token IS TRUE");
-
-			if (!qualifiedNodeAnnos.isEmpty()) {
-				String orExpr = Joiner.on(")|(").join(qualifiedNodeAnnos);
-				template.append(" OR node_qannotext ~ '(^((").append(orExpr).append(")):(.*)$)' ");
-			}
-			if (!unqualifiedNodeAnnos.isEmpty()) {
-				String orExpr = Joiner.on(")|(").join(unqualifiedNodeAnnos);
-				template.append(" OR node_annotext ~ '(^((").append(orExpr).append(")):(.*)$)' ");
-			}
+			template.append("\tAND (");
+			template.append(nodeAnnotationFilterCond);
 			template.append(")\n");
 		}
 
